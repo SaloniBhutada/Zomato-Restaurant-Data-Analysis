@@ -1,2 +1,2 @@
 # Zomato-Restaurant-Data-Analysis
-The basic idea is analyzing the Buisness Problem of Zomato to get a fair idea about the factors affecting the establishment of different types of restaurant at different places in Bengaluru, aggregate rating of each restaurant and many more.
+The basic idea behind this project was to analyze each restaurant's performance on Zomato. The dataset from Kaggle provided numerous characteristics for judging a restaurant based on ratings, votes, location, cuisines, and so on, through which we were able to effectively perform Exploratory Data Analysis in R Studio and transform all of the business questions into findings.
