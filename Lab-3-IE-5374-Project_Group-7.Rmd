@@ -1,0 +1,373 @@
+---
+title: "Project - Group 7 Zomato Restaurant Recommendation"
+output:
+  pdf_document:
+    latex_engine: xelatex
+---
+
+Group Members:
+1. Aman Maheshwari
+2. Saloni Bhutada
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+Problem Statement - To perform EDA on Zomato Restaurant Data and give recommendations of restaurants based on them. 
+
+Step 1: Load libraries and datasets
+
+Loading the all the necessary libraries
+
+```{r}
+library(stringr)
+library(dplyr)
+library(readxl)
+library(tidyr)
+library(dplyr)  
+library(magrittr)
+library(stringr)
+library(lubridate)
+library(lemon)
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+library(libr)
+library(lessR)
+library(sf)
+library(data.table)
+library(maps)      
+library(mapdata)    
+```
+
+We are loading the zomato and country code dataset in this step. 
+
+```{r}
+restaurant_data <- read.csv("/Users/salonihutada/Downloads/Zomato Data/zomato.csv")
+#restaurant_data
+
+country_code <- read_excel("/Users/salonihutada/Downloads/Zomato Data/Country-Code.xlsx")
+#country_code
+```
+
+Step 2: Data Cleaning And Data Wrangling
+
+We obtain the columns of our Zomato Restaurant's Main Dataset.
+
+```{r}
+#Used colnames() function to get the column names of the data
+obtaining_columns_restaurant <- colnames(restaurant_data)
+#obtaining_columns_restaurant
+
+```
+
+In the below code chunk using dim and summary we get the shape and summary of each column
+
+```{r}
+#To get the shape of the data we used dim()
+dim(restaurant_data)
+
+
+#To know the summary of the data used summary() 
+summary(restaurant_data)
+
+
+#Used the str() check for datatypes and some sample data of each columns 
+str(restaurant_data)
+```
+
+We check for the null values and perform Null Treatment
+
+```{r}
+#Check for nulls in the price column using filter() - Average.Cost.for.two == 0
+cities_with_avg_cost_zero <- restaurant_data %>% filter(Average.Cost.for.two == 0)
+#cities_with_avg_cost_zero
+
+
+#Since there are only few records with Average.Cost.for.two = 0, so we are dropping those records
+dropping_zerocost_restaurant<-restaurant_data[restaurant_data$Average.Cost.for.two != 0, ]
+#dropping_zerocost_restaurant
+
+
+#Finally count the nulls in all columns using sum(is.na())
+null_count <-  sapply(dropping_zerocost_restaurant, function(x) sum(is.na(x)))
+null_count
+
+```
+
+To join both the table on Country_Code as key column
+
+``` {r}
+#Left join both the datasets using left_join() function
+colnames(dropping_zerocost_restaurant)[3] <- "Country_Code"
+colnames(country_code)[1] <- "Country_Code"
+complete_restaurant_data <- left_join(dropping_zerocost_restaurant,country_code, by="Country_Code")
+#complete_restaurant_data
+
+
+#To remove , and split each values individually of rows we used strspilt() function
+split <- strsplit(complete_restaurant_data$Cuisines, ",")
+#unique(split)
+
+
+#Calculated the count of each individual value and stored in a new column 
+Cuisine_count<- complete_restaurant_data$Cuisines_count<- (sapply( split , length))
+#Cuisine_count
+```
+
+To calculate the total records of each unique entry of the data
+
+```{r}
+#To get total records, group_by city, then using summarize() calculate total records of the cities 
+Count_of_citywise_record <- complete_restaurant_data %>%
+          group_by(City) %>%
+          summarise(total_records=n())
+Count_of_citywise_record
+
+
+#To calculate total records, group_by city, then using summarize() calculate total records of the countries
+Count_of_countrywise_record <- complete_restaurant_data %>%
+  group_by(Country) %>%
+  summarise(total_records=n())
+Count_of_countrywise_record
+
+```
+
+Converted all the respective currencies of various countries to Dollar($) for better understanding.
+
+```{r}
+
+#To convert all the currency to dollar for further better understanding of average cost of two we used if-else condition and stored the updated price in new column
+complete_restaurant_data <- datastep(complete_restaurant_data, {
+  
+  if (Currency == "Dollar($)")
+    Average_cost_for_two <- Average.Cost.for.two * 1
+  else if (Currency == "Botswana Pula(P)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.090
+  else if (Currency == "Brazilian Real(R$)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.18
+  else if (Currency == "Indian Rupees(Rs.)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.013
+  else if (Currency == "Emirati Diram(AED)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.27
+  else if (Currency == "Indonesian Rupiah(IDR)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.000071
+  else if (Currency == "NewZealand($)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.72
+  else if (Currency == "Pounds(£)")
+    Average_cost_for_two <- Average.Cost.for.two * 1.38
+  else if (Currency == "Qatari Rial(QR)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.27
+  else if (Currency == "Rand(R)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.069
+  else if (Currency == "Sri Lankan Rupee(LKR)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.0049
+  else if (Currency == "Turkish Lira(TL)")
+    Average_cost_for_two <- Average.Cost.for.two * 0.108
+  
+})
+#complete_restaurant_data
+
+```
+
+1. Plotting a world map visualization to locate the locations of some best resturants of various countries
+
+```{r}
+#Map() and map.scale function was used to get the coordinates and the scale of the map
+map('worldHires')
+map.scale(160,0,relwidth = 0.15, metric = TRUE, ratio = TRUE)
+map.scale(160,-40,relwidth = 0.15, metric = TRUE, ratio = TRUE)
+
+#Created a new dataframe called as Excellent_Rating_restaurant_location which filters out the excellent rating restaurants and displays them with the other required columns
+Excellent_Rating_restaurant_location <-complete_restaurant_data %>% 
+  filter(Rating.text=='Excellent')  %>% 
+  select(Restaurant.Name, Longitude, Latitude, Rating.text,Country)
+#Excellent_Rating_restaurant_location
+
+
+#Acquired map plot using map function as well as points() to plot latitude and longitude of all the best restaurants cities 
+map('worldHires')
+points(Excellent_Rating_restaurant_location$Longitude, Excellent_Rating_restaurant_location$Latitude,col=2,pch=20)
+
+```
+
+2A. Countries to visit for some of the best restaurants in the world - Barchart visual based on customer's ratings
+
+```{r}
+# Created a new dataframe called as Best_Restarants which has filter based on Aggregate ratings of the customers, grouped by Country and calculated their total records
+Best_Resturants<- complete_restaurant_data %>% 
+  filter(Aggregate.rating >= 4.0) %>% 
+  select(Country,Aggregate.rating) %>% 
+  group_by(Country) %>% 
+  summarize(count =n())
+#Best_Resturants
+
+
+# Plotted a barchart visual using ggplot() function to display all the countries with amount of best restautants based on customer's feedback and the data
+Best_Restuarant_Visual <- ggplot(Best_Resturants, aes(x=Country, y = count)) + 
+  geom_bar(stat = "identity", fill="steelblue") +
+  geom_text(aes(label=count), vjust=-0.3, size=3.5) +
+  theme_minimal() +
+  labs(title="Count of Best Restuarants to visit in various countries", 
+       subtitle="Countrywise distributions")
+Best_Restuarant_Visual
+
+```
+
+2B. Pie Chart Distribution to know Restaurant's category based on customer's rating 
+
+```{r}
+#Generated a new dataframe named as Restaurant_preference_piechart which segregates the customer's rating into 3 category Most Preferred, Average Preference and Least Preferred 
+Restaurant_preference_piechart= complete_restaurant_data<- complete_restaurant_data %>% 
+                               mutate(Restaurant_ratings =      case_when(complete_restaurant_data$Aggregate.rating >= 3.5 ~ "Most Preferred",
+between(complete_restaurant_data$Aggregate.rating, 1.5,3.5) ~ "Average Preference", 
+complete_restaurant_data$Aggregate.rating <= 1.5 ~ "Least Preferred" 
+  ))
+#Restaurant_preference_piechart
+
+#To count the total values of Restaurant_preference categories we used dplyr()
+Restaurant_preference_count <- Restaurant_preference_piechart %>%                            
+                               group_by(Restaurant_ratings) %>%
+                               summarise(count = n())
+Restaurant_preference_count
+
+#Plotted a piechart using pie() function which displays the overall percentage of each distribution
+colors = c("orange", "indianred1", "paleturquoise") 
+pie(table(complete_restaurant_data$Restaurant_ratings), main="Preference of Restuarants based on Ratings",col=colors)
+
+```
+
+3. Visualized top Fast Food restaurants in USA and India
+
+```{r, echo=FALSE}
+#Created Best_Fastfood dataframe with all the required filters and displayed the top Fast food restaurants of two countries
+Cuisines_types <- c("Fast Food", "Pizza", "Burger")
+Best_Fastfood<- complete_restaurant_data %>% 
+  filter(Country %in% c("United States", "India") & Cuisines %in% Cuisines_types & Aggregate.rating >= 4.0) %>% 
+  select(Restaurant.Name,Country, Aggregate.rating) %>% 
+  group_by(Country) %>% 
+  slice_max(Aggregate.rating, n = 5, with_ties = F) %>%
+  arrange(desc(Country))
+#Best_Fastfood
+
+
+# Visualized top 5 Fast Food Restaurants in USA, India using ggplot() 
+Best_Fastfood_Visual <-ggplot(Best_Fastfood, aes(fill=Restaurant.Name, y=Aggregate.rating, x=Country)) + 
+  geom_col(width = 0.5, position = position_dodge(0.5)) +
+  coord_cartesian(ylim=c(3.5, 5.0))
+  theme_minimal() +
+  labs(title="Top 5 Fast Food Restaurants to visit in various countries", 
+       subtitle="Countrywise distributions")
+Best_Fastfood_Visual
+
+```
+
+4. Visualized top specific cuisines Restaurants to try in USA, India
+
+```{r}
+#Created Best_Specific_Cusines_Restaurant dataframe with all the required filters and displayed best Specific Cuisines Restaurants to try in USA, India
+Specific_Cuisines <- c("Chinese", "Italian", "American", "Indian", "Thai", "Japenese", "Mexican", "Asian")
+Best_Specific_Cusines_Restaurant<- complete_restaurant_data %>% 
+  filter(Country %in% c("United States","India") & split %in% Specific_Cuisines  & Aggregate.rating >= 3.5) %>% 
+  select(Restaurant.Name,Country,Cuisines, Aggregate.rating, Average_cost_for_two) %>% 
+  group_by(Country) %>% 
+  slice_max(Aggregate.rating, n = 8, with_ties = F) %>%
+  arrange(desc(Country))
+#Best_Specific_Cusines_Restaurant
+
+
+# Visualized Best Specific Cuisines Restaurants in USA, India using ggplot() 
+Specific_Cuisines_Visual <-ggplot(Best_Specific_Cusines_Restaurant, aes(fill=Country, y=Aggregate.rating, x=Cuisines))+
+  geom_col(width = 0.5, position = position_dodge(0.5)) +
+  #geom_bar(stat = "identity") +
+  coord_cartesian(ylim=c(3.5, 5.0))
+  theme_minimal() +
+  labs(title="Top specific cuisines Restaurants to visit in various countries", 
+       subtitle="Countrywise distributions")
+Specific_Cuisines_Visual
+
+```
+
+5. Visualized Fine Dining Restaurants to try in USA, India
+
+```{r}
+# Created Fine_Dining_for_Date dataframe with all the required filters and displayed Best Fine Dining Restaurants to try in USA, India
+Specific_Cuisines <- c("Chinese", "Italian", "American", "Thai", "Japenese", "Mexican", "Asian")
+Fine_Dining_for_Date<- complete_restaurant_data %>% 
+  filter(Country %in% c("Phillipines","India", "UAE", "United Kingdom" ) & split %in% Specific_Cuisines  &      Aggregate.rating >= 3.5 & Has.Table.booking == "Yes") %>% 
+  select(Restaurant.Name, Country, Cuisines, Aggregate.rating) %>% 
+  group_by(Country) %>% 
+  slice_max(Aggregate.rating, n = 40, with_ties = F) %>%
+  arrange(desc(Country))
+#Fine_Dining_for_Date
+
+
+# Visualized Best Fine Dining Restaurants to try in USA, India using ggplot() 
+Fine_Dining_for_Date <-ggplot(Fine_Dining_for_Date, aes(fill=Country, y=Aggregate.rating, x=Cuisines)) + 
+  geom_col(width = 0.5, position = position_dodge(0.5)) +
+  #geom_bar(stat = "identity") +
+  coord_cartesian(ylim=c(3.5, 5.0))
+  theme_minimal() +
+  labs(title="Best Fine Dining Restaurants in USA, India to visit", 
+       subtitle="Countrywise distributions")
+Fine_Dining_for_Date
+
+```
+
+6. Visualized Best Cafes to hangout in UAE, India
+
+```{r}
+# Created Best_Cafe_for_Date dataframe with all the required filters and displayed top cafes in USA, India for Students -- Average_cost_for_two, Horizontal barchart
+  Cafe_Seletion_for_Date <- c("Cafe","Beverages", "Coffee")
+  Best_Cafe_for_Date<- complete_restaurant_data %>% 
+    filter(Country %in% c("United States","India", "UAE") & split %in% Cafe_Seletion_for_Date & Aggregate.rating >=4.0) %>% 
+    select(Restaurant.Name,Country,Cuisines, Aggregate.rating, Average_cost_for_two ) %>% 
+    group_by(Country) %>% 
+    slice_max(Aggregate.rating, n = 5, with_ties = F) %>%
+    arrange(desc(Country))
+  #Best_Cafe_for_Date
+  
+# Visualized Best Cafes to hangout in USA, India using ggplot()
+Best_Cafe_for_Date_Visual <-ggplot(Best_Cafe_for_Date, aes(fill=Restaurant.Name, y=Aggregate.rating, x=Country)) + 
+    geom_col(width = 0.5, position = position_dodge(0.5)) +
+    #geom_bar(stat = "identity") +
+    coord_cartesian(ylim=c(3.5, 5.0))
+    theme_minimal() +
+    labs(title=" Best Cafes to hangout in UAE, India", 
+         subtitle="Countrywise distributions")
+Best_Cafe_for_Date_Visual
+```
+
+7. Visualized maximum online deliveries available across top countries like USA, India & UAE.
+
+```{r}
+#Created Onlinedelivery_avaliable dataframe for cities with maximum online deliveries carried out
+Onlinedelivery_avaliable<- complete_restaurant_data %>%
+  filter(complete_restaurant_data$Has.Online.delivery =="Yes", Country %in% c("United States","India","UAE")) %>%
+  group_by(City)  %>%
+  summarise(Number_of_Online_Deliveries = n())%>%
+  arrange(desc(Number_of_Online_Deliveries)) %>%
+  head(10)
+#Onlinedelivery_avaliable
+
+#Visualized cities with maximum online deliveries carried out using ggplot()
+Onlinedelivery_avaliable_visual<- ggplot(Onlinedelivery_avaliable, aes(x=City,fill = City , y=Number_of_Online_Deliveries)) +
+  geom_bar(stat='identity')+
+  ggtitle("Cities with Maximum Online Deliveries")+
+  theme(axis.text.x=element_text(angle=45,hjust=1,vjust=0.5))
+  labs(x="Cities", y="Number of Online Deliveries")+
+  theme_minimal()+
+  theme(plot.title = element_text(hjust = 0.5))+
+  geom_hline(yintercept=max(Onlinedelivery_avaliable$Number_of_Online_Deliveries), linetype="dashed")
+Onlinedelivery_avaliable_visual
+```
+
+Conclusion: Using the Zomato Restaurant Dataset, which provides numerous characteristics for judging a restaurant such as ratings, votes, location, cuisines, and so on, we were able to effectively transform all of the business questions into the findings using EDA.
+
+
+#Learning 
+By this Project we got the basic understanding of how much importance a data analytics can play into multiple decision making process like, Where to open a new restaurant?, What is speciality of this restauarnt?, How much a meal can cost me?, etc.
+This project covers the entire process, including data wrangling, cleaning, and EDA.
+Along with the fundamental approach, we learned how to use libraries such as ggplot, maps, mapdata, sf, gridextra, and others.
+We may deduce from this project that there are "n" viable business solutions that can be obtained by employing data analytics.
+
+
